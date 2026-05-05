@@ -1,4 +1,5 @@
 import logging
+import re
 import warnings
 from datetime import datetime
 
@@ -32,10 +33,42 @@ from config import (
 )
 from keyboards import back_to_menu, main_menu
 
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO,
-)
+class _SecretRedactionFilter(logging.Filter):
+    def __init__(self, secrets: list[str]) -> None:
+        super().__init__()
+        self.secrets = [secret for secret in secrets if secret]
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        for secret in self.secrets:
+            message = message.replace(secret, "<redacted>")
+        message = re.sub(
+            r"https://api\.telegram\.org/bot[^/\s]+/",
+            "[telegram-api-url-redacted]",
+            message,
+        )
+        message = re.sub(r"bot\d+:[A-Za-z0-9_-]+", "bot<redacted>", message)
+        record.msg = message
+        record.args = ()
+        return True
+
+def _configure_logging() -> None:
+    logging.basicConfig(
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        level=logging.INFO,
+    )
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("telegram").setLevel(logging.WARNING)
+    logging.getLogger("telegram.ext").setLevel(logging.WARNING)
+
+    redaction_filter = _SecretRedactionFilter([BOT_TOKEN])
+    root_logger = logging.getLogger()
+    root_logger.addFilter(redaction_filter)
+    for handler in root_logger.handlers:
+        handler.addFilter(redaction_filter)
+
+_configure_logging()
 logger = logging.getLogger(__name__)
 
 ASK_NAME, ASK_EMAIL, ASK_PHONE, ASK_MESSAGE = range(4)
@@ -285,15 +318,15 @@ async def got_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 
     if sheets_connected:
         try:
-            sheets.append_lead(lead)
+            sheets.append_lead({**lead, "storage_status": "saved"})
             storage_state = "saved"
-            logger.info("Lead saved to Google Sheets: %s", row)
+            logger.info("Google Sheets row saved")
         except Exception as exc:
             storage_state = "write_issue"
-            logger.error("Google Sheets write failed: %s", exc)
+            logger.error("Google Sheets write issue: %s", exc)
 
     if storage_state != "saved":
-        logger.info("Preview lead row: %s", row)
+        logger.info("New demo lead captured: %s", row)
 
     admin_sent = False
     if is_admin_configured():

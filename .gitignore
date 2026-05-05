@@ -1,6 +1,10 @@
 # Environment & secrets
 .env
+.env.local
 credentials.json
+*.json
+!package.json
+!package-lock.json
 
 # Python
 __pycache__/
@@ -13,6 +17,9 @@ env/
 *.egg-info/
 dist/
 build/
+
+# Tool output
+.playwright-mcp/
 
 # OS
 .DS_Store
