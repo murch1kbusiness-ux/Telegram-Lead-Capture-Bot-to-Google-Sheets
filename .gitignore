@@ -1,0 +1,19 @@
+# Environment & secrets
+.env
+credentials.json
+
+# Python
+__pycache__/
+*.pyc
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# OS
+.DS_Store
+Thumbs.db
